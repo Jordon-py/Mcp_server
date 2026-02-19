@@ -7,7 +7,7 @@ from mcp.server.fastmcp import FastMCP
 class PromptClinicInput(BaseModel):
     draft: str = Field(None, min_length=1, description="Rough prompt text")
     goal: Optional[str] = Field(default="Act as a senior dev and rewrite my prompt...Produce a production-grade system prompt + test cases", description="What you want the prompt to accomplish")
-    constraints: List[str] = Field(default_factory=list, default= ["Be concise", "No web browsing", "Return JSON"])
+    constraints: List[str] = Field(default=["Be concise", "No web browsing", "Return JSON"], description="List of constraints for the prompt")
     audience: Optional[str] = Field(default="Jr Developer", description="Who the prompt is for")
 
 class PromptClinicOutput(BaseModel):
@@ -23,7 +23,7 @@ PromptClinicOutput.model_rebuild()
 # 2) MCP SERVER ---------------------------------------------------------------
 
 mcp = FastMCP("PromptClinic", stateless_http=True, json_response=True)
-app = mcp.http_app(path="/mcp")
+app = mcp.streamable_http_app()
 
 
 @mcp.tool()

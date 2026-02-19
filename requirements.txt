@@ -1,0 +1,6 @@
+mcp
+pydantic>=2.0
+uvicorn
+starlette
+sse-starlette
+python-dotenv
