@@ -32,7 +32,12 @@ PromptClinicOutput.model_rebuild()
 # 2) MCP SERVER ---------------------------------------------------------------
 
 # stateless_http=True is recommended for scaled / multi-worker situations
-mcp = FastMCP("PromptClinic", stateless_http=True, json_response=True)
+mcp = FastMCP(
+    "PromptClinic",
+    stateless_http=True,
+    json_response=True,
+    streamable_http_path="/mcp",
+)
 
 @mcp.tool()
 def prompt_clinic(payload: PromptClinicInput) -> PromptClinicOutput:
@@ -122,8 +127,8 @@ async def health_check(request):
 
 
 # 3) ASGI APP EXPORT ----------------------------------------------------------
-# FastMCP default path is /mcp/ unless you customize it. :contentReference[oaicite:2]{index=2}
-app = mcp.http_app(path="/mcp")
+# Use StreamableHTTP transport in current FastMCP versions.
+app = mcp.streamable_http_app()
 
 
 # Local run (Heroku uses Procfile, but this is handy for quick tests)
