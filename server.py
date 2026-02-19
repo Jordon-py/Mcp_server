@@ -39,6 +39,20 @@ mcp = FastMCP(
     streamable_http_path="/mcp",
 )
 
+@mcp.custom_route("/", methods=["GET"])
+async def root(request):
+    return {
+        "ok": True,
+        "service": "prompt-clinic-mcp",
+        "mcp_endpoint": "/mcp",
+        "health": "/health",
+    }
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health(request):
+    return {"status": "ok"}
+
+
 @mcp.tool()
 def prompt_clinic(payload: PromptClinicInput) -> PromptClinicOutput:
     """
