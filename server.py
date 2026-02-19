@@ -2,6 +2,8 @@ import os
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
+from starlette.responses import JSONResponse
+
 from mcp.server.fastmcp import FastMCP
 
 # 1) MODELS FIRST -------------------------------------------------------------
@@ -37,20 +39,21 @@ mcp = FastMCP(
     stateless_http=True,
     json_response=True,
     streamable_http_path="/mcp",
+    host="0.0.0.0",
 )
 
 @mcp.custom_route("/", methods=["GET"])
 async def root(request):
-    return {
+    return JSONResponse({
         "ok": True,
         "service": "prompt-clinic-mcp",
         "mcp_endpoint": "/mcp",
         "health": "/health",
-    }
+    })
 
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request):
-    return {"status": "ok"}
+    return JSONResponse({"status": "ok", "service": "prompt-clinic-mcp"})
 
 
 @mcp.tool()
@@ -132,12 +135,6 @@ Constraints:
         risks.append("No constraints provided; output may be verbose or under-specified.")
 
     return PromptClinicOutput(upgraded_prompt=upgraded, checklist=checklist, risks=risks)
-
-
-# Optional: health check endpoint (useful for Heroku + quick sanity checks)
-@mcp.custom_route("/health", methods=["GET"])
-async def health_check(request):
-    return {"status": "ok", "service": "prompt-clinic-mcp"}
 
 
 # 3) ASGI APP EXPORT ----------------------------------------------------------
