@@ -1,48 +1,53 @@
-from pydantic import BaseModel, Field
+import os
 from typing import List, Optional
+
+from pydantic import BaseModel, Field
 from mcp.server.fastmcp import FastMCP
 
 # 1) MODELS FIRST -------------------------------------------------------------
 
 class PromptClinicInput(BaseModel):
-    draft: str = Field(None, min_length=1, description="Rough prompt text")
-    goal: Optional[str] = Field(default="Act as a senior dev and rewrite my prompt...Produce a production-grade system prompt + test cases", description="What you want the prompt to accomplish")
-    constraints: List[str] = Field(default=["Be concise", "No web browsing", "Return JSON"], description="List of constraints for the prompt")
+    draft: str = Field(..., min_length=1, description="Rough prompt text")
+    goal: Optional[str] = Field(
+        default="Act as a senior dev and rewrite my prompt... Produce a production-grade system prompt + test cases",
+        description="What you want the prompt to accomplish",
+    )
+    constraints: List[str] = Field(
+        default_factory=lambda: ["Be concise", "No web browsing", "Return JSON"],
+        description="List of constraints for the prompt",
+    )
     audience: Optional[str] = Field(default="Jr Developer", description="Who the prompt is for")
+
 
 class PromptClinicOutput(BaseModel):
     upgraded_prompt: str
     checklist: List[str] = Field(default_factory=list)
     risks: List[str] = Field(default_factory=list)
 
-# If any of your models reference each other using forward refs (strings),
-# call model_rebuild() AFTER all models are declared:
+
+# (Not strictly required here, but safe if you later add forward refs)
 PromptClinicInput.model_rebuild()
 PromptClinicOutput.model_rebuild()
 
 # 2) MCP SERVER ---------------------------------------------------------------
 
+# stateless_http=True is recommended for scaled / multi-worker situations
 mcp = FastMCP("PromptClinic", stateless_http=True, json_response=True)
-app = mcp.streamable_http_app()
-
 
 @mcp.tool()
-def prompt_clinic(payload=PromptClinicInput) -> PromptClinicOutput:
+def prompt_clinic(payload: PromptClinicInput) -> PromptClinicOutput:
     """
     Turn a rough prompt into a production-grade prompt spec:
     clear goal, constraints, output contract, and verification gates.
     """
-
     draft = payload.draft.strip()
     goal = (payload.goal or "").strip()
     audience = (payload.audience or "").strip()
     constraints = payload.constraints or []
 
-    # 1) Derive missing pieces (light inference, still transparent)
     inferred_goal = goal if goal else "Generate high-quality output that satisfies the user's intent."
     inferred_audience = audience if audience else "General technical audience"
 
-    # 2) Build an upgraded prompt (structured + deterministic)
     upgraded = f"""
 You are an expert assistant. Follow the process below *before* producing the final answer.
 
@@ -107,15 +112,22 @@ Constraints:
     if not constraints:
         risks.append("No constraints provided; output may be verbose or under-specified.")
 
-    return PromptClinicOutput(
-        upgraded_prompt=upgraded,
-        checklist=checklist,
-        risks=risks
-    )
+    return PromptClinicOutput(upgraded_prompt=upgraded, checklist=checklist, risks=risks)
 
 
-# 3) RUN ----------------------------------------------------------------------
+# Optional: health check endpoint (useful for Heroku + quick sanity checks)
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request):
+    return {"status": "ok", "service": "prompt-clinic-mcp"}
 
+
+# 3) ASGI APP EXPORT ----------------------------------------------------------
+# FastMCP default path is /mcp/ unless you customize it. :contentReference[oaicite:2]{index=2}
+app = mcp.http_app(path="/mcp")
+
+
+# Local run (Heroku uses Procfile, but this is handy for quick tests)
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(mcp.run(transport="streamable-http", ))
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run("server:app", host="0.0.0.0", port=port, log_level="info")

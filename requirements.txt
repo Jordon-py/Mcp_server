@@ -4,3 +4,4 @@ uvicorn
 starlette
 sse-starlette
 python-dotenv
+gunicorn
